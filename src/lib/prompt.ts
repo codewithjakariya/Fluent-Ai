@@ -1,4 +1,4 @@
-import { getPhase, getUnit, QUIZ_QUESTIONS_PER_UNIT, type Unit } from "./curriculum";
+import { getLesson, getPhase, getUnit, QUIZ_QUESTIONS_PER_UNIT, type Unit } from "./curriculum";
 
 const QUIZ_STAGES = [
   {
@@ -25,6 +25,7 @@ export type LessonStage = (typeof QUIZ_STAGES)[number]["key"];
 
 export interface PromptContext {
   unitId: number;
+  lessonId?: number;
   stage?: LessonStage;
   completed?: boolean;
   askingForHelp?: boolean;
@@ -38,6 +39,14 @@ function stageInstruction(stage: LessonStage | undefined, unitId: number): strin
 
 export function buildSystemPrompt(ctx: PromptContext): string {
   const unit: Unit | undefined = getUnit(ctx.unitId);
+  const lesson = ctx.lessonId ? getLesson(ctx.unitId, ctx.lessonId) : undefined;
+  const lessonBlock = lesson
+    ? [
+        `CURRENT LESSON (Lesson ${lesson.id} inside ${unit ? `Unit ${unit.id}` : "this unit"}): ${lesson.title}.`,
+        `Lesson goal you must teach and practice right now: ${lesson.goal}.`,
+        "Focus your teaching and your questions ONLY on this lesson's goal. Later lessons of this unit will come afterwards, one at a time."
+      ].join("\n")
+    : "";
   const unitBlock = unit
     ? [
         `CURRENT UNIT (Unit ${unit.id}, Phase ${unit.phase}): ${unit.title}.`,
@@ -70,7 +79,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "- Keep every reply SHORT: 2 to 4 sentences maximum.",
     "- Conversational spoken English, natural for reading aloud.",
     "- STRICTLY PLAIN TEXT: no markdown, no asterisks, no bullet points, no numbered lists, no emojis, no symbols like # or >.",
-    "- Ask only ONE question per reply, never two. End with that single question whenever a next step is needed.",
+    "- QUESTION RULE, HIGHEST PRIORITY: EVERY single reply MUST end with exactly ONE question for the learner to answer. Never end a reply with only a statement. In teaching stage the question advances today's lesson. In quiz stage the question is one of the quiz questions. Never ask two questions in one reply, and never end without a question.",
     "- Never write sound effects, stage directions, or things like laughs or smiles.",
     "",
     "DIFFICULTY RULE:",
@@ -88,8 +97,11 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "Bengali for speaking must be natural, everyday Bangla, written in Bengali script. English sentences must be simple, clear, and repeatable.",
     "",
     unitBlock,
+    lessonBlock,
     "",
-    "Begin the conversation when the learner speaks. If the learner says hello or their first message, greet them briefly in English (in Phase 1 add one short Bengali line of welcome), confirm today's unit in one sentence, and ask your one question to start."
+    "Begin the conversation when the learner speaks. On the FIRST message of a session, greet the learner briefly in English (in Phase 1 add one short Bengali line of welcome), confirm today's unit and lesson in one sentence, and IMMEDIATELY ask your one simple starter question about today's lesson goal.",
+    "",
+    "FINAL CHECK before you answer: is your reply 2 to 4 short sentences, plain text, and does it end with exactly one question? If not, fix it before sending."
   ]
     .filter(Boolean)
     .join("\n");

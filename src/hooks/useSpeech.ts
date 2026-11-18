@@ -72,7 +72,17 @@ async function speakWithElevenLabs(text: string, apiKey: string, voiceId: string
   URL.revokeObjectURL(url);
 }
 
-function speakWithBrowser(text: string, onDone: () => void): void {
+const ENGLISH_VOICE_PRIORITY = ["en-IN", "en-GB", "en-AU", "en-US"];
+
+function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  for (const prefix of ENGLISH_VOICE_PRIORITY) {
+    const match = voices.find((v) => v.lang.toLowerCase().startsWith(prefix));
+    if (match) return match;
+  }
+  return voices.find((v) => v.lang.toLowerCase().startsWith("en"));
+}
+
+function speakWithBrowser(text: string, rate: number, onDone: () => void): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onDone();
     return;
@@ -81,9 +91,12 @@ function speakWithBrowser(text: string, onDone: () => void): void {
   const utterance = new SpeechSynthesisUtterance(text);
   const hasBengali = /[\u0980-\u09FF]/.test(text);
   utterance.lang = hasBengali ? "bn-BD" : "en-US";
-  utterance.rate = hasBengali ? 0.95 : 1;
+  utterance.rate = hasBengali ? Math.min(rate, 0.9) : rate;
+  utterance.pitch = 1;
   const voices = window.speechSynthesis.getVoices();
-  const match = voices.find((v) => v.lang.toLowerCase().startsWith(hasBengali ? "bn" : "en"));
+  const match = hasBengali
+    ? voices.find((v) => v.lang.toLowerCase().startsWith("bn"))
+    : pickEnglishVoice(voices);
   if (match) utterance.voice = match;
   utterance.onend = onDone;
   utterance.onerror = onDone;
@@ -117,6 +130,7 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
     key: process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY ?? "",
     voiceId: process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID ?? ""
   });
+  const speechRateRef = useRef(0.85);
 
   modeRef.current = mode;
   mutedRef.current = muted;
@@ -240,10 +254,10 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
       if (key && voiceId) {
         await speakWithElevenLabs(clean, key, voiceId);
       } else {
-        await new Promise<void>((resolve) => speakWithBrowser(clean, resolve));
+        await new Promise<void>((resolve) => speakWithBrowser(clean, speechRateRef.current, resolve));
       }
     } catch {
-      await new Promise<void>((resolve) => speakWithBrowser(clean, resolve));
+      await new Promise<void>((resolve) => speakWithBrowser(clean, speechRateRef.current, resolve));
     } finally {
       speakingRef.current = false;
       if (wantListeningRef.current && modeRef.current === "auto") {
@@ -283,6 +297,10 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
     });
   }, [startListening, stopListening]);
 
+  const setRate = useCallback((rate: number) => {
+    speechRateRef.current = rate;
+  }, []);
+
   return {
     supported,
     state,
@@ -290,6 +308,7 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
     mode,
     toggleMode,
     muted,
+    setRate,
     setMuted,
     error,
     clearError: () => setError(null),

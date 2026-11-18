@@ -14,7 +14,9 @@ import {
   X,
   ListTree,
   Zap,
-  FlaskConical
+  FlaskConical,
+  Gauge,
+  ArrowRight
 } from "lucide-react";
 import CurriculumSidebar from "@/components/CurriculumSidebar";
 import VoiceOrb from "@/components/VoiceOrb";
@@ -24,12 +26,18 @@ import IeltsTimer from "@/components/IeltsTimer";
 import { useSpeech } from "@/hooks/useSpeech";
 import { useProgress } from "@/hooks/useProgress";
 import { type LessonStage } from "@/lib/prompt";
-import { getPhase, getUnit } from "@/lib/curriculum";
+import { getPhase, getUnit, getLesson, lessonKey } from "@/lib/curriculum";
 import type { TutorState } from "@/hooks/useSpeech";
 
 const QUIZ_TURN_THRESHOLD = 5;
-const COMPLETE_SUGGESTION_TURN = 7;
+const COMPLETE_SUGGESTION_TURN = 6;
 const HELP_PATTERN = /(help me|confused|don'?t understand|did not understand|bujhi|bujhte parchi|bujhina|explain in bengali|in bengali)/i;
+
+const SPEED_OPTIONS = [
+  { label: "Slow", value: 0.7 },
+  { label: "Clear", value: 0.85 },
+  { label: "Normal", value: 1.0 }
+];
 
 type SessionState = "ready" | "active";
 type TutorMode = "live" | "demo" | null;
@@ -42,31 +50,45 @@ export default function HomePage() {
   const [typed, setTyped] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
   const [turnsInUnit, setTurnsInUnit] = useState(0);
-  const [completeHint, setCompleteHint] = useState(false);
+  const [sessionReadyHint, setSessionReadyHint] = useState(false);
   const [sessionState, setSessionState] = useState<SessionState>("ready");
   const [tutorMode, setTutorMode] = useState<TutorMode>(null);
 
   const busyRef = useRef(false);
   const sessionStateRef = useRef<SessionState>("ready");
   sessionStateRef.current = sessionState;
-
-  const speechRef = useRef<ReturnType<typeof useSpeech> | null>(null);
-
   const sendRef = useRef<((text: string, greeting?: boolean) => Promise<void>) | null>(null);
 
-  const handleFinalTranscript = useCallback(
-    (text: string) => {
-      if (sessionStateRef.current !== "active") return;
-      void sendRef.current?.(text);
-    },
-    []
-  );
+  const handleFinalTranscript = useCallback((text: string) => {
+    if (sessionStateRef.current !== "active") return;
+    void sendRef.current?.(text);
+  }, []);
 
   const speech = useSpeech({
     onFinalTranscript: handleFinalTranscript,
     onInterimTranscript: setInterim
   });
+  const speechRef = useRef(speech);
   speechRef.current = speech;
+
+  useEffect(() => {
+    speech.setRate(progress.speechRate);
+  }, [progress.speechRate, speech]);
+
+  const unit = progress.currentUnit;
+  const lesson = getLesson(progress.currentUnitId, progress.currentLessonId) ?? unit.lessons[0];
+  const phase = getPhase(unit.phase);
+  const isUnitDone = progress.completedUnits.includes(unit.id);
+  const isLessonDone = !!progress.completedLessons[lessonKey(unit.id, lesson.id)];
+  const unitLessonDoneCount = unit.lessons.filter(
+    (l) => progress.completedLessons[lessonKey(unit.id, l.id)]
+  ).length;
+  const allLessonsDone = unitLessonDoneCount === unit.lessons.length;
+  const lessonPercent = Object.values(progress.completedLessons).filter(Boolean).length;
+  const nextLesson = unit.lessons.find(
+    (l) => l.id > lesson.id && !progress.completedLessons[lessonKey(unit.id, l.id)]
+  );
+  const stageLabel: LessonStage = turnsInUnit >= QUIZ_TURN_THRESHOLD ? "quiz" : "teach";
 
   const sendToTutor = useCallback(
     async (rawText: string, isGreeting = false) => {
@@ -83,7 +105,6 @@ export default function HomePage() {
       setInterim("");
       speechRef.current?.setState("thinking");
 
-      const stage: LessonStage = turnsInUnit >= QUIZ_TURN_THRESHOLD ? "quiz" : "teach";
       const askingForHelp = !isGreeting && HELP_PATTERN.test(rawText);
 
       const history = [...messages, ...(userMessage ? [userMessage] : [])].map((m) => ({
@@ -99,8 +120,9 @@ export default function HomePage() {
             messages: isGreeting ? [] : history,
             unit: {
               id: progress.currentUnitId,
-              stage,
-              completed: progress.completedUnits.includes(progress.currentUnitId),
+              lessonId: progress.currentLessonId,
+              stage: turnsInUnit >= QUIZ_TURN_THRESHOLD ? "quiz" : "teach",
+              completed: isLessonDone,
               askingForHelp,
               learnerName: progress.learnerName || undefined
             }
@@ -118,7 +140,7 @@ export default function HomePage() {
         setMessages((prev) => [...prev, aiMessage]);
         if (isUserTurn) {
           setTurnsInUnit((t) => t + 1);
-          if (turnsInUnit + 1 >= COMPLETE_SUGGESTION_TURN) setCompleteHint(true);
+          if (turnsInUnit + 1 >= COMPLETE_SUGGESTION_TURN) setSessionReadyHint(true);
         }
         await speechRef.current?.speak(reply);
       } catch {
@@ -133,34 +155,45 @@ export default function HomePage() {
         busyRef.current = false;
       }
     },
-    [messages, progress, turnsInUnit] // eslint-disable-line react-hooks/exhaustive-deps
+    [messages, progress, turnsInUnit, isLessonDone] // eslint-disable-line react-hooks/exhaustive-deps
   );
   sendRef.current = sendToTutor;
 
-  const startSession = useCallback(() => {
+  const resetSessionUi = useCallback(() => {
     setMessages([]);
     setInterim("");
     setTurnsInUnit(0);
-    setCompleteHint(false);
-    setSessionState("active");
-    void sendRef.current?.("__greet__", true);
+    setSessionReadyHint(false);
   }, []);
 
-  const handleSelectUnit = useCallback(
-    (id: number) => {
-      const selected = getUnit(id);
-      if (!selected || selected.id === progress.currentUnitId) return;
-      progress.selectUnit(selected);
+  const startSession = useCallback(() => {
+    resetSessionUi();
+    setSessionState("active");
+    void sendRef.current?.("__greet__", true);
+  }, [resetSessionUi]);
+
+  const handleSelectLesson = useCallback(
+    (unitId: number, lessonId: number) => {
+      setShowSidebar(false);
+      if (unitId === progress.currentUnitId && lessonId === progress.currentLessonId) return;
+      progress.selectLesson(unitId, lessonId);
       speechRef.current?.stopSpeaking();
       speechRef.current?.setState("ready");
+      resetSessionUi();
       setSessionState("ready");
-      setMessages([]);
-      setInterim("");
-      setTurnsInUnit(0);
-      setCompleteHint(false);
     },
-    [progress]
+    [progress, resetSessionUi]
   );
+
+  const goToNextLesson = useCallback(() => {
+    const current = getUnit(progress.currentUnitId);
+    const target =
+      current?.lessons.find((l) => l.id > lesson.id) ?? current?.lessons[0];
+    if (target) progress.selectLesson(progress.currentUnitId, target.id);
+    speechRef.current?.setState("ready");
+    resetSessionUi();
+    setSessionState("ready");
+  }, [lesson.id, progress, resetSessionUi]);
 
   const handleTranslate = useCallback(
     async (messageId: string) => {
@@ -225,10 +258,6 @@ export default function HomePage() {
     void sendToTutor(text);
   };
 
-  const unit = progress.currentUnit;
-  const phase = getPhase(unit.phase);
-  const isUnitDone = progress.completedUnits.includes(unit.id);
-  const stageLabel = turnsInUnit >= QUIZ_TURN_THRESHOLD ? "Quiz" : "Lesson";
   const listening = speech.state === "listening";
 
   return (
@@ -236,27 +265,30 @@ export default function HomePage() {
       <div className="hidden lg:block w-80 shrink-0 h-full">
         <CurriculumSidebar
           currentUnitId={progress.currentUnitId}
+          currentLessonId={progress.currentLessonId}
           completedUnits={progress.completedUnits}
+          completedLessons={progress.completedLessons}
           notes={progress.notes}
-          onSelectUnit={handleSelectUnit}
+          onSelectLesson={handleSelectLesson}
           onSaveNote={progress.saveNote}
           progressPercent={progress.progressPercent}
+          lessonPercent={lessonPercent}
         />
       </div>
 
       {showSidebar && (
-        <div className="fixed inset-0 z-40 flex lg:hidden">
+        <div className="fixed inset-0 z-40 lg:hidden flex">
           <div className="w-80 max-w-[85%] h-full">
             <CurriculumSidebar
               currentUnitId={progress.currentUnitId}
+              currentLessonId={progress.currentLessonId}
               completedUnits={progress.completedUnits}
+              completedLessons={progress.completedLessons}
               notes={progress.notes}
-              onSelectUnit={(id) => {
-                handleSelectUnit(id);
-                setShowSidebar(false);
-              }}
+              onSelectLesson={handleSelectLesson}
               onSaveNote={progress.saveNote}
               progressPercent={progress.progressPercent}
+              lessonPercent={lessonPercent}
             />
           </div>
           <button
@@ -281,25 +313,27 @@ export default function HomePage() {
             <div className="flex items-center gap-2">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-white truncate">
                 <BookOpen size={14} className="text-brand-400 shrink-0" />
-                Phase {unit.phase} · Unit {unit.id}: {unit.title}
+                Phase {unit.phase} · Unit {unit.id}.{lesson.id}: {lesson.title}
               </h2>
-              {isUnitDone && (
+              {(isLessonDone || isUnitDone) && (
                 <span className="flex items-center gap-1 rounded-full bg-success-500/15 border border-success-500/25 px-2 py-0.5 text-[10px] font-semibold text-success-300">
-                  <CheckCircle2 size={10} /> COMPLETED
+                  <CheckCircle2 size={10} /> {isUnitDone ? "UNIT COMPLETED" : "LESSON DONE"}
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-ink-500 truncate">{phase?.goal}</p>
+            <p className="text-[11px] text-ink-500 truncate">
+              {unit.title} · {unitLessonDoneCount}/{unit.lessons.length} lessons · {phase?.title}
+            </p>
           </div>
 
           {sessionState === "active" && (
             <span className="hidden sm:flex items-center gap-1.5 rounded-full border border-white/5 bg-ink-900 px-2.5 py-1 text-[10px] font-medium tracking-wide text-ink-300">
-              {stageLabel === "Quiz" ? (
+              {stageLabel === "quiz" ? (
                 <FlaskConical size={11} className="text-gold-400" />
               ) : (
                 <Zap size={11} className="text-brand-400" />
               )}
-              {stageLabel.toUpperCase()}
+              {stageLabel === "quiz" ? "QUIZ" : "LESSON"}
             </span>
           )}
 
@@ -355,15 +389,15 @@ export default function HomePage() {
             }`}
           >
             {sessionState === "ready" ? (
-              <div className="flex flex-col items-center gap-8 animate-fade-up">
+              <div className="flex flex-col items-center gap-7 animate-fade-up">
                 <VoiceOrb state="ready" />
                 <div className="max-w-lg px-6 text-center">
-                  <h3 className="text-lg font-semibold text-white">
-                    Unit {unit.id}: {unit.title}
+                  <h3 className="text-base font-semibold text-white">
+                    Lesson {unit.id}.{lesson.id} — {lesson.title}
                   </h3>
-                  <p className="mt-2 text-sm text-ink-400 leading-relaxed">{unit.topic}</p>
-                  <p className="mt-1.5 text-xs text-ink-500">
-                    Questions ramp from simple to advanced — IELTS-style in Phase 4.
+                  <p className="mt-2 text-sm text-ink-400 leading-relaxed">{lesson.goal}</p>
+                  <p className="mt-2 text-xs text-ink-500">
+                    {unit.title} · Phase {unit.phase} · questions ramp from simple to advanced, IELTS-style in Phase 4.
                   </p>
                 </div>
                 <button
@@ -374,8 +408,27 @@ export default function HomePage() {
                   <Play size={18} />
                   Start Session
                 </button>
+
+                <div className="flex items-center gap-2.5 rounded-full border border-white/5 bg-ink-900/70 px-3 py-1.5">
+                  <Gauge size={13} className="text-ink-400" />
+                  <span className="text-[11px] text-ink-400">Alex speaks:</span>
+                  {SPEED_OPTIONS.map((option) => (
+                    <button
+                      key={option.label}
+                      type="button"
+                      onClick={() => progress.setSpeechRate(option.value)}
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                        progress.speechRate === option.value
+                          ? "bg-brand-600 text-white"
+                          : "text-ink-400 hover:text-ink-200"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
                 <p className="text-[11px] text-ink-500">
-                  Alex will greet you and ask his first question — answer with Push to Talk.
+                  Alex will ask his first question — answer with Push to Talk.
                 </p>
               </div>
             ) : (
@@ -384,7 +437,7 @@ export default function HomePage() {
 
                 {unit.kind === "ielts_part2" && (
                   <div className="mt-10 w-full max-w-md px-4">
-                    <IeltsTimer visible phaseLabel={`Unit ${unit.id} practice`} />
+                    <IeltsTimer visible phaseLabel={`Lesson ${unit.id}.${lesson.id}`} />
                   </div>
                 )}
 
@@ -406,14 +459,29 @@ export default function HomePage() {
                   {speech.mode === "push" ? "Switch to auto-listen mode" : "Switch back to Push to Talk"}
                 </button>
 
-                <div className="mt-6 flex items-center gap-3">
-                  {completeHint && !isUnitDone && (
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+                  {sessionReadyHint && !isLessonDone && (
                     <button
                       type="button"
-                      onClick={() => {
-                        progress.markComplete(unit.id);
-                        setCompleteHint(false);
-                      }}
+                      onClick={() => progress.markLessonComplete(unit.id, lesson.id)}
+                      className="flex items-center gap-1.5 rounded-full bg-success-600 hover:bg-success-500 px-4 py-1.5 text-xs font-semibold text-white shadow-glow-success transition-colors"
+                    >
+                      <CheckCircle2 size={12} /> Mark Lesson {unit.id}.{lesson.id} complete
+                    </button>
+                  )}
+                  {isLessonDone && !isUnitDone && (
+                    <button
+                      type="button"
+                      onClick={goToNextLesson}
+                      className="flex items-center gap-1.5 rounded-full bg-brand-600 hover:bg-brand-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors"
+                    >
+                      {nextLesson ? `Next: ${nextLesson.title}` : "Restart unit lessons"} <ArrowRight size={12} />
+                    </button>
+                  )}
+                  {allLessonsDone && !isUnitDone && (
+                    <button
+                      type="button"
+                      onClick={() => progress.markComplete(unit.id)}
                       className="flex items-center gap-1.5 rounded-full bg-success-600 hover:bg-success-500 px-4 py-1.5 text-xs font-semibold text-white shadow-glow-success transition-colors"
                     >
                       <CheckCircle2 size={12} /> Complete Unit {unit.id}

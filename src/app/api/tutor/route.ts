@@ -14,6 +14,7 @@ interface TutorRequestBody {
   messages: ChatTurn[];
   unit: {
     id: number;
+    lessonId?: number;
     stage?: LessonStage;
     completed?: boolean;
     askingForHelp?: boolean;
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
 
   const systemPrompt = buildSystemPrompt({
     unitId: unit?.id ?? 1,
+    lessonId: unit?.lessonId,
     stage: unit?.stage,
     completed: unit?.completed,
     askingForHelp: unit?.askingForHelp,

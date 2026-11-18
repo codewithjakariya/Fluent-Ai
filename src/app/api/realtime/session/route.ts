@@ -3,12 +3,15 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 /**
- * OpenAI Realtime API slot.
+ * OpenAI Realtime API slot (PAID — OpenAI only; Groq does not offer realtime).
  *
  * Flow: the browser calls POST /api/realtime/session, this route exchanges the
  * server-side OPENAI_API_KEY for a short-lived ephemeral session token, and the
  * browser then opens a direct WebSocket to the Realtime endpoint with that token.
  * This keeps your real API key server-side.
+ *
+ * If you are only using the free Groq setup, ignore this route entirely —
+ * the app works fine with Web Speech API + Groq chat.
  */
 export async function POST() {
   const apiKey = process.env.OPENAI_API_KEY;

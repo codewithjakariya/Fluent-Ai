@@ -105,7 +105,7 @@ export default function HomePage() {
       const errMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        text: "I could not reach my AI brain. Please check your connection and OPENAI_API_KEY in the .env file."
+        text: "I could not reach my AI brain. Please check your connection and your GROQ_API_KEY in the .env file."
       };
       setMessages((prev) => [...prev, errMsg]);
       speech.setState("idle");

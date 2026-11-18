@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildSystemPrompt, DEMO_FALLBACK_LINES, type LessonStage } from "@/lib/prompt";
+import { resolveProvider } from "@/lib/aiProvider";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,7 +22,7 @@ interface TutorRequestBody {
 }
 
 const OFFLINE_RESPONSES: string[] = [
-  "Hello, I am Alex, your English tutor, and I am really happy to practice with you. Right now my AI brain is offline because no OPENAI_API_KEY is set in the .env file, but we can still do a quick practice round. Tell me, which sentence would you like to try saying in English today?",
+  "Hello, I am Alex, your English tutor, and I am really happy to practice with you. Right now my AI brain is offline because no GROQ_API_KEY is set in the .env file, but we can still do a quick practice round. Tell me, which sentence would you like to try saying in English today?",
   "Good effort! I can hear you clearly. Remember, I would normally correct your grammar very gently here, and you would repeat the sentence after me. Since my AI connection is missing, try repeating: I am practicing English every day. Can you say that nicely for me?",
   "You are doing nicely, and I like your confidence. In the full version of this app I would now ask one short quiz question about today's unit. Would you like to try one practice question anyway?"
 ];
@@ -37,9 +38,9 @@ export async function POST(request: Request) {
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   const unit = body?.unit;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const provider = resolveProvider();
 
-  if (!apiKey) {
+  if (!provider) {
     const index = messages.filter((m) => m?.role === "user").length;
     const fallback =
       unit?.askingForHelp
@@ -50,7 +51,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: fallback, mode: "demo" });
   }
 
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const systemPrompt = buildSystemPrompt({
     unitId: unit?.id ?? 1,
     stage: unit?.stage,
@@ -65,14 +65,14 @@ export async function POST(request: Request) {
     .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${provider.apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model,
+        model: provider.chatModel,
         messages: [{ role: "system", content: systemPrompt }, ...recent],
         temperature: 0.7,
         max_tokens: 220
@@ -81,9 +81,15 @@ export async function POST(request: Request) {
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      console.error("OpenAI error", res.status, detail.slice(0, 500));
+      console.error("Chat completion error", provider.provider, res.status, detail.slice(0, 500));
       return NextResponse.json(
-        { error: "AI service failed. Please check your OPENAI_API_KEY.", mode: "error" },
+        {
+          error:
+            provider.provider === "groq"
+              ? "Groq request failed. Check your GROQ_API_KEY or model name in .env."
+              : "AI service failed. Please check your OPENAI_API_KEY.",
+          mode: "error"
+        },
         { status: 502 }
       );
     }

@@ -92,7 +92,7 @@ function speakWithBrowser(text: string, onDone: () => void): void {
 
 // ---- Hook ----
 
-export type TutorState = "idle" | "listening" | "thinking" | "speaking";
+export type TutorState = "ready" | "listening" | "thinking" | "speaking";
 export type ListenMode = "push" | "auto";
 
 export interface UseSpeechOptions {
@@ -102,7 +102,7 @@ export interface UseSpeechOptions {
 
 export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechOptions) {
   const [supported, setSupported] = useState(false);
-  const [state, setState] = useState<TutorState>("idle");
+  const [state, setState] = useState<TutorState>("ready");
   const [mode, setMode] = useState<ListenMode>("push");
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,7 +185,7 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
           // start() can throw if called too quickly; fall through
         }
       }
-      setState((s) => (s === "listening" ? "idle" : s));
+      setState((s) => (s === "listening" ? "ready" : s));
     };
 
     recognitionRef.current = recognition;
@@ -226,7 +226,7 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
         // ignore
       }
     }
-    setState("idle");
+    setState("ready");
   }, []);
 
   const speak = useCallback(async (text: string) => {
@@ -257,7 +257,7 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
           }
         }
       } else {
-        setState(wantListeningRef.current ? "listening" : "idle");
+        setState(wantListeningRef.current ? "listening" : "ready");
       }
     }
   }, []);
@@ -268,7 +268,7 @@ export function useSpeech({ onFinalTranscript, onInterimTranscript }: UseSpeechO
       window.speechSynthesis.cancel();
     }
     document.querySelectorAll("audio").forEach((el) => el.pause());
-    setState(wantListeningRef.current ? "listening" : "idle");
+    setState(wantListeningRef.current ? "listening" : "ready");
   }, []);
 
   const toggleMode = useCallback(() => {

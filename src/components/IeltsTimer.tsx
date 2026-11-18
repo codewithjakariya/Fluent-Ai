@@ -57,19 +57,19 @@ export default function IeltsTimer({
   };
 
   const stageColor =
-    stage === "prep" ? "stroke-amber-400" : stage === "speak" ? "stroke-emerald-400" : "stroke-slate-500";
+    stage === "prep" ? "stroke-amber-400" : stage === "speak" ? "stroke-emerald-400" : "stroke-ink-500";
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+    <div className="rounded-2xl border border-ink-800 bg-ink-900/70 p-5">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+        <div className="flex items-center gap-2 text-sm font-semibold text-ink-200">
           <Timer size={16} className="text-brand-400" />
           IELTS Part 2: Cue Card
         </div>
         <button
           type="button"
           onClick={reset}
-          className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
+          className="flex items-center gap-1 text-xs text-ink-400 hover:text-ink-200"
         >
           <RotateCcw size={12} /> Reset
         </button>
@@ -97,12 +97,12 @@ export default function IeltsTimer({
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-ink-300">
             {stage === "prep" && "1 minute preparation — think and take notes out loud if you like."}
             {stage === "speak" && "Speak now — keep going for the full 2 minutes."}
             {stage === "done" && "Time finished. Alex will now discuss what you said."}
           </p>
-          <p className="mt-1 text-xs text-slate-500">{phaseLabel}</p>
+          <p className="mt-1 text-xs text-ink-500">{phaseLabel}</p>
           <div className="mt-3 flex gap-2">
             <button
               type="button"

@@ -57,22 +57,22 @@ export default function CurriculumSidebar({
   };
 
   return (
-    <aside className="flex h-full w-full flex-col bg-slate-950 border-r border-slate-800">
-      <div className="px-5 py-5 border-b border-slate-800">
+    <aside className="flex h-full w-full flex-col bg-ink-950 border-r border-ink-800">
+      <div className="px-5 py-5 border-b border-ink-800">
         <h1 className="flex items-center gap-2 text-lg font-bold text-white">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-fuchsia-600">
             <GraduationCap size={18} />
           </span>
           FluentAI
         </h1>
-        <p className="mt-1 text-xs text-slate-400">AI Voice English Tutor · বাংলা + English</p>
+        <p className="mt-1 text-xs text-ink-400">AI Voice English Tutor · বাংলা + English</p>
 
         <div className="mt-4">
-          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+          <div className="flex justify-between text-[11px] text-ink-400 mb-1">
             <span>{completedUnits.length} of 20 units done</span>
             <span className="tabular-nums">{progressPercent}%</span>
           </div>
-          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-ink-800 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-brand-500 transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
@@ -88,7 +88,7 @@ export default function CurriculumSidebar({
           const phaseDone = phase.units.every((u) => completedUnits.includes(u.id));
 
           return (
-            <div key={phase.id} className="rounded-xl bg-slate-900/60">
+            <div key={phase.id} className="rounded-xl bg-ink-900/60">
               <button
                 type="button"
                 onClick={() => togglePhase(phase.id)}
@@ -96,15 +96,15 @@ export default function CurriculumSidebar({
               >
                 <Icon size={16} className={PHASE_ACCENT[phase.id - 1]} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-100 truncate">
+                  <p className="text-sm font-semibold text-ink-100 truncate">
                     Phase {phase.id}: {phase.title}
                   </p>
-                  <p className="text-[11px] text-slate-500 truncate">{phase.goal}</p>
+                  <p className="text-[11px] text-ink-500 truncate">{phase.goal}</p>
                 </div>
                 {phaseDone && <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />}
                 <ChevronDown
                   size={14}
-                  className={`text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  className={`text-ink-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
                 />
               </button>
 
@@ -117,10 +117,10 @@ export default function CurriculumSidebar({
                     const isIelts = phase.id === 4;
 
                     return (
-                      <li key={unit.id} className="rounded-lg bg-slate-950/60">
+                      <li key={unit.id} className="rounded-lg bg-ink-950/60">
                         <div
                           className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors ${
-                            isCurrent ? "bg-brand-600/25 ring-1 ring-brand-500/40" : "hover:bg-slate-900"
+                            isCurrent ? "bg-brand-600/25 ring-1 ring-brand-500/40" : "hover:bg-ink-900"
                           }`}
                         >
                           <button
@@ -133,12 +133,12 @@ export default function CurriculumSidebar({
                             ) : isCurrent ? (
                               <Mic size={14} className="text-brand-300 shrink-0 animate-pulse" />
                             ) : (
-                              <Circle size={14} className="text-slate-600 shrink-0" />
+                              <Circle size={14} className="text-ink-600 shrink-0" />
                             )}
                             <span className="min-w-0">
                               <span
                                 className={`block text-[13px] leading-tight truncate ${
-                                  isCurrent ? "text-white font-medium" : "text-slate-300"
+                                  isCurrent ? "text-white font-medium" : "text-ink-300"
                                 }`}
                               >
                                 Unit {unit.id}: {unit.title}
@@ -152,7 +152,7 @@ export default function CurriculumSidebar({
                             type="button"
                             aria-label={`Note for unit ${unit.id}`}
                             onClick={() => openNote(unit.id)}
-                            className={`shrink-0 ${hasNote ? "text-amber-300" : "text-slate-600 hover:text-slate-400"}`}
+                            className={`shrink-0 ${hasNote ? "text-amber-300" : "text-ink-600 hover:text-ink-400"}`}
                           >
                             <Notebook size={13} />
                           </button>
@@ -165,13 +165,13 @@ export default function CurriculumSidebar({
                               onChange={(e) => setNoteDraft(e.target.value)}
                               placeholder="My notes for this unit…"
                               rows={3}
-                              className="w-full rounded-md bg-slate-900 border border-slate-700 px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-brand-500"
+                              className="w-full rounded-md bg-ink-900 border border-ink-700 px-2 py-1.5 text-xs text-ink-200 placeholder:text-ink-600 focus:outline-none focus:border-brand-500"
                             />
                             <div className="mt-1 flex gap-2 justify-end">
                               <button
                                 type="button"
                                 onClick={() => setNoteEditing(null)}
-                                className="text-[11px] text-slate-500 hover:text-slate-300"
+                                className="text-[11px] text-ink-500 hover:text-ink-300"
                               >
                                 Cancel
                               </button>
@@ -198,7 +198,7 @@ export default function CurriculumSidebar({
         })}
       </nav>
 
-      <div className="border-t border-slate-800 px-5 py-3 text-[11px] text-slate-500">
+      <div className="border-t border-ink-800 px-5 py-3 text-[11px] text-ink-500">
         Progress &amp; notes are saved in your browser automatically.
       </div>
     </aside>

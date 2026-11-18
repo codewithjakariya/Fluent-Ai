@@ -1,11 +1,10 @@
 "use client";
 
-import { Headphones, Mic, MicOff } from "lucide-react";
-import type { ListenMode, TutorState } from "@/hooks/useSpeech";
+import { Mic } from "lucide-react";
+import type { TutorState } from "@/hooks/useSpeech";
 
 interface MicButtonProps {
   state: TutorState;
-  mode: ListenMode;
   supported: boolean;
   listening: boolean;
   onPushStart: () => void;
@@ -14,53 +13,58 @@ interface MicButtonProps {
 
 export default function MicButton({
   state,
-  mode,
   supported,
   listening,
   onPushStart,
   onPushEnd
 }: MicButtonProps) {
-  const speaking = state === "speaking";
-  const disabled = !supported || speaking;
+  const busy = state === "speaking" || state === "thinking";
+  const disabled = !supported || busy;
+
+  const press = () => !disabled && onPushStart();
+  const release = () => !disabled && listening && onPushEnd();
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-2.5">
       <button
         type="button"
-        aria-label={listening ? "Stop listening" : "Start listening"}
+        aria-label={listening ? "Release to send" : "Hold to talk"}
         disabled={disabled}
-        onMouseDown={() => !disabled && onPushStart()}
-        onMouseUp={() => !disabled && onPushEnd()}
-        onMouseLeave={() => !disabled && listening && onPushEnd()}
+        onMouseDown={press}
+        onMouseUp={release}
+        onMouseLeave={release}
         onTouchStart={(e) => {
           e.preventDefault();
-          if (!disabled) onPushStart();
+          press();
         }}
         onTouchEnd={(e) => {
           e.preventDefault();
-          if (!disabled && listening) onPushEnd();
+          release();
         }}
-        className={`relative flex items-center justify-center w-20 h-20 rounded-full text-white transition-all
+        className={`group flex items-center gap-2.5 rounded-full pl-4 pr-6 py-3.5 font-semibold text-[15px] text-white transition-all
           ${disabled
-            ? "bg-slate-700 cursor-not-allowed"
+            ? "bg-ink-800 text-ink-500 cursor-not-allowed"
             : listening
-            ? "bg-emerald-500 hover:bg-emerald-400 scale-105 shadow-lg shadow-emerald-500/40"
-            : "bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-600/40"}`}
+            ? "bg-success-600 hover:bg-success-500 scale-[1.02] shadow-glow-success"
+            : "bg-brand-600 hover:bg-brand-500 shadow-glow active:scale-95"}`}
       >
-        {listening ? <Mic size={30} /> : <MicOff size={30} className="opacity-60" />}
-        {!supported && (
-          <span className="absolute inset-0 rounded-full ring-2 ring-red-400/60" />
-        )}
+        <span
+          className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+            listening ? "bg-white/20" : "bg-white/10 group-active:bg-white/20"
+          }`}
+        >
+          <Mic size={18} />
+        </span>
+        {listening ? "Listening… release to send" : busy ? "Alex is responding…" : "Push to Talk"}
       </button>
-      <p className="flex items-center gap-1.5 text-xs text-slate-400">
-        <Headphones size={12} />
-        {mode === "push"
-          ? supported
-            ? "Hold to talk"
-            : "Speech recognition not supported in this browser — try Chrome"
-          : supported
-          ? "Auto-listen: just speak"
-          : null}
+      <p className="text-[11px] text-ink-500">
+        {supported
+          ? listening
+            ? "Release the button (or Space) when done"
+            : busy
+            ? "One moment…"
+            : "Hold the button — or hold the Space key"
+          : "Speech recognition needs Chrome or Edge — type below instead"}
       </p>
     </div>
   );
